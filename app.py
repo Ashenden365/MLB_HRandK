@@ -258,7 +258,6 @@ if tracker == "Home Run Tracker":
 
     # Main content for Home Run Tracker
     st.title("MLB Home Run Pace Comparison — 2025 Season")
-
     no_game_msgs = []
     if team1_abbr not in {'LAD', 'CHC'} and datetime.combine(start_date, datetime.min.time()) < REGULAR_START:
         no_game_msgs.append(f"No official MLB games for {player1_name} ({team1_abbr}) before 2025-03-27.")
@@ -278,8 +277,14 @@ if tracker == "Home Run Tracker":
         (col2, p2_id, player2_name, team2_code)
     ]:
         with col:
-            st.subheader(f"{name} ({team_info[code]['name']})")
-            st.image(get_player_image(pid), width=100)
+            st.markdown(
+                f"<div style='text-align:center; font-size:1.6em; font-weight:700;'>{name}<br>({team_info[code]['name']})</div>",
+                unsafe_allow_html=True
+            )
+            st.markdown(
+                f"<div style='display:flex; justify-content:center;'><img src='{get_player_image(pid)}' width='100' style='margin-bottom:10px;'></div>",
+                unsafe_allow_html=True
+            )
             df_hr = fetch_hr_log(
                 pid,
                 datetime.combine(start_date, datetime.min.time()),
@@ -412,7 +417,6 @@ elif tracker == "Strikeout Tracker":
 
     # Main content for Strikeout Tracker
     st.title("MLB Strikeout Tracker — 2025 Season")
-
     no_game_msgs = []
     if team1_abbr not in {'LAD', 'CHC'} and datetime.combine(start_date, datetime.min.time()) < REGULAR_START:
         no_game_msgs.append(f"No official MLB games for {pitcher1_name} ({team1_abbr}) before 2025-03-27.")
@@ -432,8 +436,14 @@ elif tracker == "Strikeout Tracker":
         (col2, p2_id, pitcher2_name, team2_code)
     ]:
         with col:
-            st.subheader(f"{name} ({team_info[code]['name']})")
-            st.image(get_player_image(pid), width=100)
+            st.markdown(
+                f"<div style='text-align:center; font-size:1.6em; font-weight:700;'>{name}<br>({team_info[code]['name']})</div>",
+                unsafe_allow_html=True
+            )
+            st.markdown(
+                f"<div style='display:flex; justify-content:center;'><img src='{get_player_image(pid)}' width='100' style='margin-bottom:10px;'></div>",
+                unsafe_allow_html=True
+            )
             df_k = fetch_k_log(
                 pid,
                 datetime.combine(start_date, datetime.min.time()),
@@ -461,8 +471,8 @@ elif tracker == "Strikeout Tracker":
     if all(not logs[n].empty for n in [pitcher1_name, pitcher2_name]):
         st.subheader("Head-to-Head Comparison")
         merged = pd.concat([
-            logs[pitcher1_name].assign(Pitcher=player1_name),
-            logs[pitcher2_name].assign(Pitcher=player2_name)
+            logs[pitcher1_name].assign(Pitcher=pitcher1_name),
+            logs[pitcher2_name].assign(Pitcher=pitcher2_name)
         ])
         comparison = (
             alt.Chart(merged)
@@ -501,7 +511,6 @@ with st.sidebar:
     if filtered:
         for news in filtered:
             pub = news.get('published', '')
-            # pubDate例: "Tue, 02 Jul 2024 00:13:30 GMT"
             try:
                 pub_dt_utc = pd.to_datetime(pub).tz_localize('UTC')
                 pub_dt_edt = pub_dt_utc.tz_convert('America/New_York')
