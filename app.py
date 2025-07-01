@@ -252,12 +252,16 @@ if tracker == "Home Run Tracker":
         (col2, p2_id, player2_name, team2_code)
     ]:
         with col:
-            # ★ここを2行固定に修正★
+            # 選手名・チーム名（2行中央揃え）
             st.markdown(
                 f"<div style='text-align:center; font-size:1.6em; font-weight:700;'>{name}<br>({team_info[code]['name']})</div>",
                 unsafe_allow_html=True
             )
-            st.image(get_player_image(pid), width=100)
+            # 顔写真も完全中央寄せ
+            st.markdown(
+                f"<div style='display:flex; justify-content:center;'><img src='{get_player_image(pid)}' width='100' style='margin-bottom:10px;'></div>",
+                unsafe_allow_html=True
+            )
             df_hr = fetch_hr_log(
                 pid,
                 datetime.combine(start_date, datetime.min.time()),
@@ -410,12 +414,14 @@ elif tracker == "Strikeout Tracker":
         (col2, p2_id, pitcher2_name, team2_code)
     ]:
         with col:
-            # ★ここを2行固定に修正★
             st.markdown(
                 f"<div style='text-align:center; font-size:1.6em; font-weight:700;'>{name}<br>({team_info[code]['name']})</div>",
                 unsafe_allow_html=True
             )
-            st.image(get_player_image(pid), width=100)
+            st.markdown(
+                f"<div style='display:flex; justify-content:center;'><img src='{get_player_image(pid)}' width='100' style='margin-bottom:10px;'></div>",
+                unsafe_allow_html=True
+            )
             df_k = fetch_k_log(
                 pid,
                 datetime.combine(start_date, datetime.min.time()),
