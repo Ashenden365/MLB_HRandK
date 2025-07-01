@@ -4,6 +4,8 @@ import altair as alt
 from datetime import datetime, date
 import statsapi
 from pybaseball import playerid_reverse_lookup, statcast_pitcher, statcast_batter
+import feedparser
+import pytz
 
 # MLB Season Settings
 TOKYO_START   = datetime(2025, 3, 18)
@@ -14,7 +16,30 @@ ORANGE     = "#FF8000"
 
 st.set_page_config(layout="wide", page_title="MLB 2025 Tracker")
 
-# Helper: Team Info
+# --- NEWS (RSS-based) ---
+def fetch_mlb_news_rss():
+    url = "https://www.mlb.com/feeds/news/rss.xml"
+    feed = feedparser.parse(url)
+    articles = []
+    for entry in feed.entries:
+        articles.append({
+            "title": entry.title,
+            "link": entry.link,
+            "summary": entry.summary if 'summary' in entry else '',
+            "published": entry.published if 'published' in entry else ''
+        })
+    return articles
+
+def is_valid_news(article):
+    teaser_keywords = ["vote", "voting", "check back", "countdown", "announcement"]
+    content = (article["title"] + " " + article["summary"]).lower()
+    if any(kw in content for kw in teaser_keywords):
+        return False
+    if len(article["summary"].strip()) == 0 and len(article["title"].strip()) == 0:
+        return False
+    return True
+
+# --- TEAM INFO ---
 @st.cache_data(ttl=12 * 60 * 60)
 def get_team_info():
     teams_raw = statsapi.get('teams', {'sportIds': 1})['teams']
@@ -36,7 +61,7 @@ team_abbrs = sorted(team_info.keys())
 team_names = [team_info[a]['name'] for a in team_abbrs]
 abbr_by_name = {team_info[a]['name']: a for a in team_abbrs}
 
-# Helper: Players
+# --- PLAYERS ---
 @st.cache_data(ttl=12 * 60 * 60)
 def build_rosters():
     teams_raw = statsapi.get('teams', {'sportIds': 1})['teams']
@@ -72,12 +97,12 @@ if OTANI_NAME not in pitcher_map:
     pitchers.insert(0, (OTANI_NAME, OTANI_ID, OTANI_TEAM))
     pitcher_map[OTANI_NAME] = (OTANI_ID, OTANI_TEAM)
 
-# Helper: Image
+# --- PLAYER IMAGE ---
 def get_player_image(pid: int) -> str:
     return (f"https://img.mlbstatic.com/mlb-photos/image/upload/"
             f"w_180,q_100/v1/people/{pid}/headshot/67/current.png")
 
-# Helper: Data fetch
+# --- DATA FETCH ---
 def fetch_hr_log(pid: int, start: datetime, end: datetime, team_abbr: str) -> pd.DataFrame:
     df = statcast_batter(
         start_dt=start.strftime('%Y-%m-%d'),
@@ -144,14 +169,14 @@ def fetch_k_log(pid: int, start: datetime, end: datetime, team_abbr: str) -> pd.
         lambda x: pid2name(x) if pd.notna(x) else '')
     return df_k
 
-# Sidebar: Tracker selection (radio)
+# --- SIDEBAR ---
 tracker = st.sidebar.radio(
     "Select Tracker", 
     ["Home Run Tracker", "Strikeout Tracker"], 
     key="tracker_tab"
 )
 
-# Tracker-specific UI
+# --- MAIN ---
 if tracker == "Home Run Tracker":
     st.sidebar.header("Select Batters and Date Range")
     st.sidebar.info(
@@ -233,6 +258,7 @@ if tracker == "Home Run Tracker":
 
     # Main content for Home Run Tracker
     st.title("MLB Home Run Pace Comparison — 2025 Season")
+
     no_game_msgs = []
     if team1_abbr not in {'LAD', 'CHC'} and datetime.combine(start_date, datetime.min.time()) < REGULAR_START:
         no_game_msgs.append(f"No official MLB games for {player1_name} ({team1_abbr}) before 2025-03-27.")
@@ -252,16 +278,8 @@ if tracker == "Home Run Tracker":
         (col2, p2_id, player2_name, team2_code)
     ]:
         with col:
-            # 選手名・チーム名（2行中央揃え）
-            st.markdown(
-                f"<div style='text-align:center; font-size:1.6em; font-weight:700;'>{name}<br>({team_info[code]['name']})</div>",
-                unsafe_allow_html=True
-            )
-            # 顔写真も完全中央寄せ
-            st.markdown(
-                f"<div style='display:flex; justify-content:center;'><img src='{get_player_image(pid)}' width='100' style='margin-bottom:10px;'></div>",
-                unsafe_allow_html=True
-            )
+            st.subheader(f"{name} ({team_info[code]['name']})")
+            st.image(get_player_image(pid), width=100)
             df_hr = fetch_hr_log(
                 pid,
                 datetime.combine(start_date, datetime.min.time()),
@@ -309,7 +327,7 @@ if tracker == "Home Run Tracker":
         )
         st.altair_chart(comparison, use_container_width=True)
 
-    st.caption("Data: Statcast (pybaseball) • Rosters: MLB-StatsAPI • Built with Streamlit")
+    st.caption("Game data: Statcast (pybaseball), Rosters: MLB-StatsAPI | News: MLB.com RSS feed")
 
 elif tracker == "Strikeout Tracker":
     st.sidebar.header("Select Pitchers and Date Range")
@@ -324,7 +342,6 @@ elif tracker == "Strikeout Tracker":
         index=team_names.index(default_team1) if default_team1 in team_names else 0,
         key="k_team1")
     team1_abbr = abbr_by_name[team1_name]
-    # Ohtani will always be present in the pitchers list for LAD
     team1_pitchers = [n for n, _, t in pitchers if t == team1_abbr]
     if OTANI_NAME not in team1_pitchers and team1_abbr == OTANI_TEAM:
         team1_pitchers.insert(0, OTANI_NAME)
@@ -395,6 +412,7 @@ elif tracker == "Strikeout Tracker":
 
     # Main content for Strikeout Tracker
     st.title("MLB Strikeout Tracker — 2025 Season")
+
     no_game_msgs = []
     if team1_abbr not in {'LAD', 'CHC'} and datetime.combine(start_date, datetime.min.time()) < REGULAR_START:
         no_game_msgs.append(f"No official MLB games for {pitcher1_name} ({team1_abbr}) before 2025-03-27.")
@@ -414,14 +432,8 @@ elif tracker == "Strikeout Tracker":
         (col2, p2_id, pitcher2_name, team2_code)
     ]:
         with col:
-            st.markdown(
-                f"<div style='text-align:center; font-size:1.6em; font-weight:700;'>{name}<br>({team_info[code]['name']})</div>",
-                unsafe_allow_html=True
-            )
-            st.markdown(
-                f"<div style='display:flex; justify-content:center;'><img src='{get_player_image(pid)}' width='100' style='margin-bottom:10px;'></div>",
-                unsafe_allow_html=True
-            )
+            st.subheader(f"{name} ({team_info[code]['name']})")
+            st.image(get_player_image(pid), width=100)
             df_k = fetch_k_log(
                 pid,
                 datetime.combine(start_date, datetime.min.time()),
@@ -449,8 +461,8 @@ elif tracker == "Strikeout Tracker":
     if all(not logs[n].empty for n in [pitcher1_name, pitcher2_name]):
         st.subheader("Head-to-Head Comparison")
         merged = pd.concat([
-            logs[pitcher1_name].assign(Pitcher=pitcher1_name),
-            logs[pitcher2_name].assign(Pitcher=pitcher2_name)
+            logs[pitcher1_name].assign(Pitcher=player1_name),
+            logs[pitcher2_name].assign(Pitcher=player2_name)
         ])
         comparison = (
             alt.Chart(merged)
@@ -469,4 +481,38 @@ elif tracker == "Strikeout Tracker":
         )
         st.altair_chart(comparison, use_container_width=True)
 
-    st.caption("Data: Statcast (pybaseball) • Rosters: MLB-StatsAPI • Built with Streamlit")
+    st.caption("Game data: Statcast (pybaseball), Rosters: MLB-StatsAPI | News: MLB.com RSS feed")
+
+# --- MLB NEWS: SIDEBAR BOTTOM ---
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("### Latest MLB News")
+    news_list = fetch_mlb_news_rss()
+    filtered = []
+    seen = set()
+    for a in news_list:
+        if not is_valid_news(a):
+            continue
+        if a['link'] not in seen:
+            filtered.append(a)
+            seen.add(a['link'])
+        if len(filtered) >= 3:
+            break
+    if filtered:
+        for news in filtered:
+            pub = news.get('published', '')
+            # pubDate例: "Tue, 02 Jul 2024 00:13:30 GMT"
+            try:
+                pub_dt_utc = pd.to_datetime(pub).tz_localize('UTC')
+                pub_dt_edt = pub_dt_utc.tz_convert('America/New_York')
+                pub_fmt = pub_dt_edt.strftime("%Y-%m-%d %H:%M EDT")
+            except Exception:
+                pub_fmt = pub[:16]
+            date_line = f"<span style='font-size:10px;color:#666;'>{pub_fmt}</span>" if pub_fmt else ""
+            st.markdown(
+                f"- [**{news['title']}**]({news['link']})  {date_line}",
+                unsafe_allow_html=True
+            )
+        st.caption("News from MLB.com RSS | Data updated automatically. All times are shown in EDT (GMT-4).")
+    else:
+        st.info("No valid MLB news articles found.")
