@@ -252,7 +252,11 @@ if tracker == "Home Run Tracker":
         (col2, p2_id, player2_name, team2_code)
     ]:
         with col:
-            st.subheader(f"{name} ({team_info[code]['name']})")
+            # ★ここを2行固定に修正★
+            st.markdown(
+                f"<div style='text-align:center; font-size:1.6em; font-weight:700;'>{name}<br>({team_info[code]['name']})</div>",
+                unsafe_allow_html=True
+            )
             st.image(get_player_image(pid), width=100)
             df_hr = fetch_hr_log(
                 pid,
@@ -406,7 +410,11 @@ elif tracker == "Strikeout Tracker":
         (col2, p2_id, pitcher2_name, team2_code)
     ]:
         with col:
-            st.subheader(f"{name} ({team_info[code]['name']})")
+            # ★ここを2行固定に修正★
+            st.markdown(
+                f"<div style='text-align:center; font-size:1.6em; font-weight:700;'>{name}<br>({team_info[code]['name']})</div>",
+                unsafe_allow_html=True
+            )
             st.image(get_player_image(pid), width=100)
             df_k = fetch_k_log(
                 pid,
